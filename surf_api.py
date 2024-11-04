@@ -3,6 +3,33 @@ import pysurfline
 from pathlib import Path
 from datetime import datetime, timedelta
 from flask import Flask, request, jsonify
+import os
+import logging
+import requests
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
+# Monkey patch the requests session in pysurfline to add headers
+old_session = requests.Session
+
+def new_session():
+    session = old_session()
+    session.headers.update({
+        'User-Agent': 'python-requests/2.31.0',
+        'Accept': '*/*',
+        'Accept-Encoding': 'gzip, deflate',
+        'Connection': 'keep-alive',
+        'Host': 'services.surfline.com'
+    })
+    # Remove any existing headers that might be causing issues
+    session.headers.pop('Origin', None)
+    session.headers.pop('Referer', None)
+    return session
+
+# Apply the monkey patch
+requests.Session = new_session
 
 app = Flask(__name__)
 
