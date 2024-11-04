@@ -1,22 +1,16 @@
+import sys
+from unittest.mock import MagicMock
+# Mock matplotlib before importing pysurfline
+sys.modules['matplotlib'] = MagicMock()
+sys.modules['matplotlib.pyplot'] = MagicMock()
+
+from pysurfline import Spot
 from flask import Flask, jsonify
-import pysurfline
 from datetime import datetime, timedelta
 import os
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
-
 app = Flask(__name__)
-
-# Initialize pysurfline at startup
-try:
-    # Test the pysurfline connection
-    test_spot = "5842041f4e65fad6a7708a7d"
-    pysurfline.get_spot_forecasts(test_spot, days=1, intervalHours=1)
-except Exception as e:
-    print(f"Error initializing pysurfline: {str(e)}")
-    # Log the error but don't crash the app
 
 def adjust_time(timestamp, utc_offset):
     """Adjust time using UTC offset and format as HH:MM"""
@@ -36,13 +30,10 @@ def create_surf_data(spot_id):
         if not spot_id.strip() or not all(c in '0123456789abcdefABCDEF' for c in spot_id):
             return None, "Invalid spot ID format"
         
-        # Attempt to get forecast data
+        # Create Spot instance and get forecasts
         try:
-            spotforecasts = pysurfline.get_spot_forecasts(
-                spot_id,
-                days=1,
-                intervalHours=1,
-            )
+            spot = Spot(spot_id)
+            spotforecasts = spot.get_forecast(days=1, interval_hours=1)
         except Exception as e:
             print(f"Error fetching surf data: {str(e)}")  # Add logging
             if "404" in str(e):
@@ -128,14 +119,6 @@ def get_surf_data(spot_id):
         'status': 'success',
         'data': data
     })
-
-@app.errorhandler(404)
-def not_found(e):
-    return jsonify({'error': 'Route not found', 'status': 'error'}), 404
-
-@app.errorhandler(500)
-def server_error(e):
-    return jsonify({'error': 'Internal server error', 'status': 'error'}), 500
 
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
