@@ -1,9 +1,3 @@
-import sys
-from unittest.mock import MagicMock
-# Mock matplotlib before importing pysurfline
-sys.modules['matplotlib'] = MagicMock()
-sys.modules['matplotlib.pyplot'] = MagicMock()
-
 from pysurfline import Spot
 from flask import Flask, jsonify
 from datetime import datetime, timedelta
