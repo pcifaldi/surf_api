@@ -9,6 +9,15 @@ load_dotenv()
 
 app = Flask(__name__)
 
+# Initialize pysurfline at startup
+try:
+    # Test the pysurfline connection
+    test_spot = "5842041f4e65fad6a7708a7d"
+    pysurfline.get_spot_forecasts(test_spot, days=1, intervalHours=1)
+except Exception as e:
+    print(f"Error initializing pysurfline: {str(e)}")
+    # Log the error but don't crash the app
+
 def adjust_time(timestamp, utc_offset):
     """Adjust time using UTC offset and format as HH:MM"""
     if hasattr(timestamp, 'timestamp'):
@@ -23,7 +32,7 @@ def adjust_time(timestamp, utc_offset):
 def create_surf_data(spot_id):
     """Generate surf data for a given spot ID"""
     try:
-        # Validate spot_id format (assuming it's a hex string)
+        # Validate spot_id format
         if not spot_id.strip() or not all(c in '0123456789abcdefABCDEF' for c in spot_id):
             return None, "Invalid spot ID format"
         
@@ -35,22 +44,14 @@ def create_surf_data(spot_id):
                 intervalHours=1,
             )
         except Exception as e:
-            # Check if it's a spot not found error
-            if "404" in str(e) or "not found" in str(e).lower():
+            print(f"Error fetching surf data: {str(e)}")  # Add logging
+            if "404" in str(e):
                 return None, f"Spot ID {spot_id} not found"
-            # Check if it's an authentication error
-            elif "401" in str(e) or "unauthorized" in str(e).lower():
+            elif "401" in str(e):
                 return None, "API authentication error"
-            # Handle rate limiting
-            elif "429" in str(e) or "too many requests" in str(e).lower():
-                return None, "Rate limit exceeded. Please try again later"
             else:
                 return None, f"Error fetching surf data: {str(e)}"
 
-        # Verify we got valid data
-        if not spotforecasts.waves or not spotforecasts.wind or not spotforecasts.tides:
-            return None, "Incomplete data received from surf API"
-        
         # Get current wave data
         current_wave = spotforecasts.waves[0]
         current_weather = spotforecasts.weather[0]
@@ -95,7 +96,16 @@ def create_surf_data(spot_id):
         }
         return data, None
     except Exception as e:
+        print(f"Unexpected error: {str(e)}")  # Add logging
         return None, f"Unexpected error: {str(e)}"
+
+@app.route('/')
+def home():
+    """Health check endpoint"""
+    return jsonify({
+        'status': 'ok',
+        'message': 'Surf API is running'
+    })
 
 @app.route('/api/surf/<spot_id>')
 def get_surf_data(spot_id):
@@ -107,15 +117,10 @@ def get_surf_data(spot_id):
             'error': error,
             'status': 'error'
         }
-        # Choose appropriate HTTP status code based on error
         if "not found" in error.lower():
             return jsonify(error_response), 404
         elif "invalid spot id format" in error.lower():
             return jsonify(error_response), 400
-        elif "rate limit" in error.lower():
-            return jsonify(error_response), 429
-        elif "authentication" in error.lower():
-            return jsonify(error_response), 401
         else:
             return jsonify(error_response), 500
     
@@ -133,6 +138,5 @@ def server_error(e):
     return jsonify({'error': 'Internal server error', 'status': 'error'}), 500
 
 if __name__ == '__main__':
-    # Get port from environment variable (Heroku sets this automatically)
     port = int(os.getenv('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
