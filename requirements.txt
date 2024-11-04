@@ -1,6 +1,6 @@
 flask==3.0.0
 gunicorn==21.2.0
-pysurfline==0.0.1
+pysurfline==0.2.1
 python-dotenv==1.0.0
 requests==2.31.0
 pandas==2.1.2
