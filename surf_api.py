@@ -1,4 +1,4 @@
-from pysurfline import Spot
+from pysurfline.core import get_spot_forecasts  # Changed this line
 from flask import Flask, jsonify
 from datetime import datetime, timedelta
 import os
@@ -24,10 +24,13 @@ def create_surf_data(spot_id):
         if not spot_id.strip() or not all(c in '0123456789abcdefABCDEF' for c in spot_id):
             return None, "Invalid spot ID format"
         
-        # Create Spot instance and get forecasts
+        # Get forecasts using the direct function
         try:
-            spot = Spot(spot_id)
-            spotforecasts = spot.get_forecast(days=1, interval_hours=1)
+            spotforecasts = get_spot_forecasts(
+                spot_id,
+                days=1,
+                intervalHours=1
+            )
         except Exception as e:
             print(f"Error fetching surf data: {str(e)}")  # Add logging
             if "404" in str(e):
