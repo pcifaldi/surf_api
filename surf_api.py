@@ -1,6 +1,27 @@
 from flask import Flask, jsonify
 import pysurfline
 from datetime import datetime, timedelta
+import logging
+import requests
+
+# Enable debug logging
+logging.basicConfig(level=logging.DEBUG)
+
+# Monkey patch the requests session in pysurfline to add headers
+old_session = requests.Session
+
+def new_session():
+    session = old_session()
+    session.headers.update({
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Origin': 'https://www.surfline.com',
+        'Referer': 'https://www.surfline.com/'
+    })
+    return session
+
+requests.Session = new_session
 
 app = Flask(__name__)
 
@@ -24,12 +45,14 @@ def create_surf_data(spot_id):
         
         # Attempt to get forecast data
         try:
+            logging.debug(f"Fetching forecast for spot ID: {spot_id}")
             spotforecasts = pysurfline.get_spot_forecasts(
                 spot_id,
                 days=1,
                 intervalHours=1,
             )
         except Exception as e:
+            logging.error(f"Error fetching forecast: {str(e)}")
             # Check if it's a spot not found error
             if "404" in str(e) or "not found" in str(e).lower():
                 return None, f"Spot ID {spot_id} not found"
@@ -88,13 +111,16 @@ def create_surf_data(spot_id):
             "sunset": adjust_time(sunlight.sunset, sunlight.sunsetUTCOffset),
             **tide_data
         }
+        logging.debug("Successfully created surf data")
         return data, None
     except Exception as e:
+        logging.error(f"Unexpected error: {str(e)}")
         return None, f"Unexpected error: {str(e)}"
 
 @app.route('/api/surf/<spot_id>')
 def get_surf_data(spot_id):
     """API endpoint that returns JSON data for a given spot ID"""
+    logging.info(f"Received request for spot ID: {spot_id}")
     data, error = create_surf_data(spot_id)
     
     if error:
@@ -119,6 +145,14 @@ def get_surf_data(spot_id):
         'data': data
     })
 
+@app.route('/')
+def home():
+    """Health check endpoint"""
+    return jsonify({
+        'status': 'ok',
+        'message': 'Surf API is running'
+    })
+
 @app.errorhandler(404)
 def not_found(e):
     return jsonify({'error': 'Route not found', 'status': 'error'}), 404
@@ -128,4 +162,5 @@ def server_error(e):
     return jsonify({'error': 'Internal server error', 'status': 'error'}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    port = int(os.getenv('PORT', 5000))
+    app.run(debug=True, host='0.0.0.0', port=port)
