@@ -115,5 +115,52 @@ def home():
         "message": "Surf API is running. Use /api/surf?spotId=<spot_id> to fetch surf data."
     })
 
+@app.route('/test/headers')
+def test_headers():
+    """Test what headers and IP we're using"""
+    url = 'https://services.surfline.com/kbyg/spots/details'
+    params = {'spotId': '5842041f4e65fad6a7708a7d'}
+    
+    try:
+        response = requests.get(url, params=params)
+        ip_response = requests.get('https://api.ipify.org?format=json')
+        ip_data = ip_response.json()
+
+        debug_info = {
+            'our_ip': ip_data.get('ip'),
+            'request_headers': dict(response.request.headers),
+            'response_status': response.status_code,
+            'response_headers': dict(response.headers),
+            'response_text': response.text[:500] + '...' if len(response.text) > 500 else response.text
+        }
+        
+        return jsonify(debug_info)
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'type': type(e).__name__
+        })
+
+@app.route('/test/local')
+def test_local():
+    """Test pysurfline's direct implementation"""
+    try:
+        result = pysurfline.get_spot_forecasts(
+            "5842041f4e65fad6a7708a7d",
+            days=1,
+            intervalHours=1
+        )
+        return jsonify({
+            'success': True,
+            'has_waves': hasattr(result, 'waves'),
+            'has_wind': hasattr(result, 'wind'),
+            'has_tides': hasattr(result, 'tides'),
+        })
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'type': type(e).__name__
+        })
+
 if __name__ == "__main__":
     app.run(debug=True)
