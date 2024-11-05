@@ -11,10 +11,10 @@ import requests
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# Smartproxy residential configuration
-SMARTPROXY_USERNAME = 'spj1z9isp9'
+# Smartproxy SOCKS5 configuration with state targeting
+SMARTPROXY_USERNAME = 'user-spj1z9isp9-session-1-state-us_south_carolina'
 SMARTPROXY_PASSWORD = 'ys~j6rwfY95HikP3jZ'
-SMARTPROXY_URL = f"http://{SMARTPROXY_USERNAME}:{SMARTPROXY_PASSWORD}@residential.smartproxy.com:10000"
+SMARTPROXY_URL = f"socks5h://{SMARTPROXY_USERNAME}:{SMARTPROXY_PASSWORD}@gate.smartproxy.com:7000"
 
 # Monkey patch the requests session
 old_session = requests.Session
@@ -41,12 +41,12 @@ def new_session():
         'Host': 'services.surfline.com'
     })
 
-    # Configure Smartproxy
+    # Configure Smartproxy SOCKS5
     session.proxies = {
         'http': SMARTPROXY_URL,
         'https': SMARTPROXY_URL
     }
-    logger.debug("Smartproxy residential configured for session")
+    logger.debug("Smartproxy SOCKS5 configured for session with South Carolina state targeting")
 
     return session
 
@@ -68,7 +68,7 @@ def test_proxy():
         surfline_response = requests.get(
             surfline_url, 
             params={'spotId': '5842041f4e65fad6a7708a7d'},
-            allow_redirects=False  # Don't follow redirects to see exact response
+            allow_redirects=False
         )
 
         return jsonify({
