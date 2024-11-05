@@ -6,15 +6,27 @@ from flask import Flask, request, jsonify
 import os
 import logging
 import requests
+import socket
+import socks
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# Smartproxy SOCKS5 configuration with state targeting
-SMARTPROXY_USERNAME = 'user-spj1z9isp9-session-1-state-us_south_carolina'
-SMARTPROXY_PASSWORD = 'ys~j6rwfY95HikP3jZ'
-SMARTPROXY_URL = f"socks5h://{SMARTPROXY_USERNAME}:{SMARTPROXY_PASSWORD}@gate.smartproxy.com:7000"
+# Set up SOCKS support for the socket library
+socks.set_default_proxy(
+    socks.SOCKS5, 
+    "gate.smartproxy.com",
+    7000,
+    username="user-spj1z9isp9-session-1-state-us_south_carolina",
+    password="ys~j6rwfY95HikP3jZ"
+)
+socket.socket = socks.socksocket
+
+# Smartproxy configuration - using residential rotating endpoint
+SMARTPROXY_USERNAME = "user-spj1z9isp9-session-1-state-us_south_carolina"
+SMARTPROXY_PASSWORD = "ys~j6rwfY95HikP3jZ"
+SMARTPROXY_URL = f"http://{SMARTPROXY_USERNAME}:{SMARTPROXY_PASSWORD}@us.smartproxy.com:10001"
 
 # Monkey patch the requests session
 old_session = requests.Session
@@ -41,12 +53,12 @@ def new_session():
         'Host': 'services.surfline.com'
     })
 
-    # Configure Smartproxy SOCKS5
+    # Configure proxy
     session.proxies = {
         'http': SMARTPROXY_URL,
         'https': SMARTPROXY_URL
     }
-    logger.debug("Smartproxy SOCKS5 configured for session with South Carolina state targeting")
+    logger.debug("Smartproxy configured for session")
 
     return session
 
@@ -59,11 +71,14 @@ app = Flask(__name__)
 def test_proxy():
     """Test the proxy configuration"""
     try:
-        # Test with different services
-        ip_response = requests.get('https://ip.smartproxy.com/json')
-        ipify_response = requests.get('https://api.ipify.org?format=json')
+        # Test with multiple IP check services
+        responses = {
+            'smartproxy': requests.get('https://ip.smartproxy.com/json').json(),
+            'ipify': requests.get('https://api.ipify.org?format=json').json(),
+            'httpbin': requests.get('https://httpbin.org/ip').json()
+        }
         
-        # Test Surfline with specific endpoint
+        # Test Surfline
         surfline_url = 'https://services.surfline.com/kbyg/spots/details'
         surfline_response = requests.get(
             surfline_url, 
@@ -72,12 +87,12 @@ def test_proxy():
         )
 
         return jsonify({
-            'smartproxy_ip': ip_response.json(),
-            'ipify_check': ipify_response.json(),
+            'ip_checks': responses,
             'headers_being_sent': dict(requests.Session().headers),
             'proxy_settings': {
                 'configured_url': SMARTPROXY_URL.replace(SMARTPROXY_PASSWORD, '****'),
-                'active_proxies': requests.Session().proxies
+                'active_proxies': requests.Session().proxies,
+                'using_socks': True
             },
             'surfline_status': surfline_response.status_code,
             'surfline_headers': dict(surfline_response.headers),
