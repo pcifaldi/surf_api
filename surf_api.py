@@ -11,10 +11,11 @@ import requests
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# Smartproxy SOCKS5 configuration for Birmingham, UK
-SMARTPROXY_USERNAME = 'user-spj1z9isp9-country-gb-city-birmingham-session-1'
-SMARTPROXY_PASSWORD = 'ys~j6rwfY95HikP3jZ'
-SMARTPROXY_URL = f"socks5h://{SMARTPROXY_USERNAME}:{SMARTPROXY_PASSWORD}@gate.smartproxy.com:7000"
+# Brightdata proxy configuration
+BRIGHTDATA_USERNAME = "brd-customer-hl_05e0f25a-zone-residential_proxy1-country-us"
+BRIGHTDATA_PASSWORD = "go7qdsqremvt"
+BRIGHTDATA_HOST = "brd.superproxy.io:22225"
+BRIGHTDATA_URL = f"http://{BRIGHTDATA_USERNAME}:{BRIGHTDATA_PASSWORD}@{BRIGHTDATA_HOST}"
 
 # Monkey patch the requests session
 old_session = requests.Session
@@ -24,20 +25,24 @@ def new_session():
     # Browser-like headers
     session.headers.update({
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-        'Accept-Language': 'en-GB,en;q=0.9',  # Updated to UK English
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'en-US,en;q=0.9',
         'Accept-Encoding': 'gzip, deflate',
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache',
-        'Connection': 'keep-alive'
+        'Origin': 'https://www.surfline.com',
+        'Referer': 'https://www.surfline.com/',
+        'DNT': '1',
+        'Connection': 'keep-alive',
+        'Sec-Fetch-Dest': 'empty',
+        'Sec-Fetch-Mode': 'cors',
+        'Sec-Fetch-Site': 'same-site'
     })
 
-    # Configure Smartproxy SOCKS5
+    # Configure Brightdata proxy
     session.proxies = {
-        'http': SMARTPROXY_URL,
-        'https': SMARTPROXY_URL
+        'http': BRIGHTDATA_URL,
+        'https': BRIGHTDATA_URL
     }
-    logger.debug(f"Configured SOCKS5 proxy: Birmingham, UK")
+    logger.debug(f"Configured Brightdata proxy: {BRIGHTDATA_HOST}")
     
     return session
 
@@ -50,29 +55,36 @@ app = Flask(__name__)
 def test_proxy():
     """Test the proxy configuration"""
     try:
-        # First test with a simple IP check
-        ip_test = requests.get('http://ip.smartproxy.com/json', timeout=10)
-        logger.debug(f"IP Test Response: {ip_test.text}")
+        logger.debug("Starting proxy test")
+        
+        # Test with multiple IP services
+        test_urls = [
+            'http://ip.brightdata.com/json',
+            'https://api.ipify.org?format=json',
+            'http://ip-api.com/json'
+        ]
+        
+        ip_results = {}
+        for url in test_urls:
+            try:
+                response = requests.get(url, timeout=10)
+                ip_results[url] = response.json()
+            except Exception as e:
+                ip_results[url] = {'error': str(e)}
 
-        # If successful, try Surfline
+        # Test Surfline
         surfline_url = 'https://services.surfline.com/kbyg/spots/details'
         surfline_response = requests.get(
             surfline_url, 
             params={'spotId': '5842041f4e65fad6a7708a7d'},
-            timeout=10,
-            allow_redirects=False
+            timeout=10
         )
 
         return jsonify({
-            'proxy_test': {
-                'ip_data': ip_test.json(),
-                'status': ip_test.status_code,
-                'proxy_type': 'SOCKS5',
-                'location': 'Birmingham, UK'
-            },
+            'ip_tests': ip_results,
             'headers_sent': dict(requests.Session().headers),
             'proxy_config': {
-                'endpoint': 'gate.smartproxy.com:7000',
+                'endpoint': BRIGHTDATA_HOST,
                 'active': bool(requests.Session().proxies)
             },
             'surfline_test': {
@@ -81,22 +93,32 @@ def test_proxy():
                 'response': surfline_response.text[:500]
             }
         })
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Request error: {str(e)}")
+    except Exception as e:
+        logger.error(f"Test error: {str(e)}")
         return jsonify({
             'error': str(e),
-            'type': 'RequestException',
+            'type': type(e).__name__,
             'details': {
                 'proxy_configured': bool(requests.Session().proxies),
                 'headers': dict(requests.Session().headers)
             }
         }), 500
+
+@app.route('/api/surf')
+def get_surf_data():
+    spot_id = request.args.get('spotId')
+    if not spot_id:
+        return jsonify({"error": "Missing spotId parameter"}), 400
+    
+    try:
+        spotforecasts = pysurfline.get_spot_forecasts(
+            spot_id,
+            days=1,
+            intervalHours=1,
+        )
+        return jsonify({"data": spotforecasts})
     except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}")
-        return jsonify({
-            'error': str(e),
-            'type': type(e).__name__
-        }), 500
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     port = int(os.getenv('PORT', 5000))
