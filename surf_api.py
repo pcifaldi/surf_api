@@ -16,16 +16,21 @@ old_session = requests.Session
 
 def new_session():
     session = old_session()
+    # Match exactly what works locally
     session.headers.update({
-        'User-Agent': 'python-requests/2.31.0',
+        'User-Agent': 'python-requests/2.32.3',
         'Accept': '*/*',
         'Accept-Encoding': 'gzip, deflate',
         'Connection': 'keep-alive',
-        'Host': 'services.surfline.com'
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+        'access-control-allow-credentials': 'true',
+        'x-auth-required': 'false'
     })
-    # Remove any existing headers that might be causing issues
+    # Remove problematic headers
     session.headers.pop('Origin', None)
     session.headers.pop('Referer', None)
+    session.headers.pop('Host', None)  # Let requests set this automatically
     return session
 
 # Apply the monkey patch
