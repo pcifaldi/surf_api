@@ -24,12 +24,22 @@ old_session = requests.Session
 
 def new_session():
     session = old_session()
+    # More browser-like headers
     session.headers.update({
-        'User-Agent': 'python-requests/2.32.3',
-        'Accept': '*/*',
-        'Accept-Encoding': 'gzip, deflate',
-        'Connection': 'keep-alive',
-        'Content-Type': 'application/json'
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+        'Accept': 'application/json,text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'sec-ch-ua': '"Google Chrome";v="119", "Chromium";v="119", "Not?A_Brand";v="24"',
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': '"macOS"',
+        'sec-fetch-dest': 'document',
+        'sec-fetch-mode': 'navigate',
+        'sec-fetch-site': 'none',
+        'sec-fetch-user': '?1',
+        'upgrade-insecure-requests': '1',
+        'Referer': 'https://www.surfline.com/',
+        'Origin': 'https://www.surfline.com'
     })
 
     # Explicitly set proxies for each session
@@ -171,9 +181,13 @@ def test_proxy():
     """Detailed proxy test"""
     try:
         # Make test requests
+        headers = dict(requests.Session().headers)
         r1 = requests.get('https://api.ipify.org?format=json')
         r2 = requests.get('http://ifconfig.me/ip')
-        r3 = requests.get('https://services.surfline.com/kbyg/spots/details?spotId=5842041f4e65fad6a7708a7d')
+        
+        # Test surfline with direct request first
+        test_url = 'https://services.surfline.com/kbyg/spots/details'
+        r3 = requests.get(test_url, params={'spotId': '5842041f4e65fad6a7708a7d'})
         
         return jsonify({
             'fixie_url_configured': bool(FIXIE_URL),
@@ -182,9 +196,11 @@ def test_proxy():
                 'https_proxy': os.getenv('HTTPS_PROXY')
             },
             'session_proxies': requests.Session().proxies,
+            'headers_being_sent': headers,
             'ip_check_1': r1.json()['ip'],
             'ip_check_2': r2.text.strip(),
             'surfline_status': r3.status_code,
+            'surfline_response': r3.text[:500] if r3.text else None,
             'surfline_headers': dict(r3.headers)
         })
     except Exception as e:
