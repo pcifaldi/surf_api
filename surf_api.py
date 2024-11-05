@@ -11,12 +11,19 @@ import requests
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+# Get the Fixie URL from environment
+FIXIE_URL = os.getenv('FIXIE_URL')
+
+# Configure the proxy globally for requests
+if FIXIE_URL:
+    os.environ['HTTP_PROXY'] = FIXIE_URL
+    os.environ['HTTPS_PROXY'] = FIXIE_URL
+
 # Monkey patch the requests session
 old_session = requests.Session
 
 def new_session():
     session = old_session()
-    # Match successful local headers
     session.headers.update({
         'User-Agent': 'python-requests/2.32.3',
         'Accept': '*/*',
@@ -25,14 +32,13 @@ def new_session():
         'Content-Type': 'application/json'
     })
 
-    # Set up Fixie proxy from environment variable
-    fixie_url = os.getenv('FIXIE_URL')
-    if fixie_url:
+    # Explicitly set proxies for each session
+    if FIXIE_URL:
         session.proxies = {
-            'http': fixie_url,
-            'https': fixie_url
+            'http': FIXIE_URL,
+            'https': FIXIE_URL
         }
-        logger.debug("Fixie proxy configured")
+        logger.debug("Fixie proxy configured for session")
 
     return session
 
@@ -155,6 +161,34 @@ def test_local():
             'has_tides': hasattr(result, 'tides'),
         })
     except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'type': type(e).__name__
+        })
+
+@app.route('/test/proxy')
+def test_proxy():
+    """Detailed proxy test"""
+    try:
+        # Make test requests
+        r1 = requests.get('https://api.ipify.org?format=json')
+        r2 = requests.get('http://ifconfig.me/ip')
+        r3 = requests.get('https://services.surfline.com/kbyg/spots/details?spotId=5842041f4e65fad6a7708a7d')
+        
+        return jsonify({
+            'fixie_url_configured': bool(FIXIE_URL),
+            'environment_proxies': {
+                'http_proxy': os.getenv('HTTP_PROXY'),
+                'https_proxy': os.getenv('HTTPS_PROXY')
+            },
+            'session_proxies': requests.Session().proxies,
+            'ip_check_1': r1.json()['ip'],
+            'ip_check_2': r2.text.strip(),
+            'surfline_status': r3.status_code,
+            'surfline_headers': dict(r3.headers)
+        })
+    except Exception as e:
+        logger.error(f"Proxy test error: {str(e)}")
         return jsonify({
             'error': str(e),
             'type': type(e).__name__
