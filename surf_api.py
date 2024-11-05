@@ -11,11 +11,10 @@ import requests
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# Smartproxy residential configuration
-SMARTPROXY_USERNAME = "user-spj1z9isp9-session-1-state-us_south_carolina"
-SMARTPROXY_PASSWORD = "ys~j6rwfY95HikP3jZ"
-# Using residential proxy endpoint
-SMARTPROXY_URL = f"http://{SMARTPROXY_USERNAME}:{SMARTPROXY_PASSWORD}@us-sc.smartproxy.com:10001"
+# Smartproxy SOCKS5 configuration for Birmingham, UK
+SMARTPROXY_USERNAME = 'user-spj1z9isp9-country-gb-city-birmingham-session-1'
+SMARTPROXY_PASSWORD = 'ys~j6rwfY95HikP3jZ'
+SMARTPROXY_URL = f"socks5h://{SMARTPROXY_USERNAME}:{SMARTPROXY_PASSWORD}@gate.smartproxy.com:7000"
 
 # Monkey patch the requests session
 old_session = requests.Session
@@ -26,19 +25,19 @@ def new_session():
     session.headers.update({
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Language': 'en-GB,en;q=0.9',  # Updated to UK English
         'Accept-Encoding': 'gzip, deflate',
         'Cache-Control': 'no-cache',
         'Pragma': 'no-cache',
         'Connection': 'keep-alive'
     })
 
-    # Configure Smartproxy
+    # Configure Smartproxy SOCKS5
     session.proxies = {
         'http': SMARTPROXY_URL,
         'https': SMARTPROXY_URL
     }
-    logger.debug(f"Configured proxy: {SMARTPROXY_URL.split('@')[1]}")
+    logger.debug(f"Configured SOCKS5 proxy: Birmingham, UK")
     
     return session
 
@@ -67,11 +66,13 @@ def test_proxy():
         return jsonify({
             'proxy_test': {
                 'ip_data': ip_test.json(),
-                'status': ip_test.status_code
+                'status': ip_test.status_code,
+                'proxy_type': 'SOCKS5',
+                'location': 'Birmingham, UK'
             },
             'headers_sent': dict(requests.Session().headers),
             'proxy_config': {
-                'endpoint': SMARTPROXY_URL.split('@')[1],
+                'endpoint': 'gate.smartproxy.com:7000',
                 'active': bool(requests.Session().proxies)
             },
             'surfline_test': {
