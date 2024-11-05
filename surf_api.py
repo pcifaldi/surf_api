@@ -11,26 +11,29 @@ import requests
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# Monkey patch the requests session in pysurfline to add headers
+# Monkey patch the requests session
 old_session = requests.Session
 
 def new_session():
     session = old_session()
-    # Match exactly what works locally
+    # Match successful local headers
     session.headers.update({
         'User-Agent': 'python-requests/2.32.3',
         'Accept': '*/*',
         'Accept-Encoding': 'gzip, deflate',
         'Connection': 'keep-alive',
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'access-control-allow-credentials': 'true',
-        'x-auth-required': 'false'
+        'Content-Type': 'application/json'
     })
-    # Remove problematic headers
-    session.headers.pop('Origin', None)
-    session.headers.pop('Referer', None)
-    session.headers.pop('Host', None)  # Let requests set this automatically
+
+    # Set up Fixie proxy from environment variable
+    fixie_url = os.getenv('FIXIE_URL')
+    if fixie_url:
+        session.proxies = {
+            'http': fixie_url,
+            'https': fixie_url
+        }
+        logger.debug("Fixie proxy configured")
+
     return session
 
 # Apply the monkey patch
@@ -120,26 +123,16 @@ def home():
         "message": "Surf API is running. Use /api/surf?spotId=<spot_id> to fetch surf data."
     })
 
-@app.route('/test/headers')
-def test_headers():
-    """Test what headers and IP we're using"""
-    url = 'https://services.surfline.com/kbyg/spots/details'
-    params = {'spotId': '5842041f4e65fad6a7708a7d'}
-    
+@app.route('/test/ip')
+def test_ip():
+    """Test what IP we're using"""
     try:
-        response = requests.get(url, params=params)
-        ip_response = requests.get('https://api.ipify.org?format=json')
-        ip_data = ip_response.json()
-
-        debug_info = {
-            'our_ip': ip_data.get('ip'),
-            'request_headers': dict(response.request.headers),
-            'response_status': response.status_code,
-            'response_headers': dict(response.headers),
-            'response_text': response.text[:500] + '...' if len(response.text) > 500 else response.text
-        }
-        
-        return jsonify(debug_info)
+        response = requests.get('https://api.ipify.org?format=json')
+        return jsonify({
+            'ip': response.json().get('ip'),
+            'using_proxy': bool(os.getenv('FIXIE_URL')),
+            'status': 'success'
+        })
     except Exception as e:
         return jsonify({
             'error': str(e),
