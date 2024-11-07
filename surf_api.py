@@ -6,6 +6,7 @@ from flask import Flask, request, jsonify
 import os
 import logging
 import requests
+from requests.auth import HTTPProxyAuth
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -13,10 +14,23 @@ logger = logging.getLogger(__name__)
 # SmartProxy configuration
 SMARTPROXY_USERNAME = 'user-spj1z9isp9-country-gb-city-birmingham'
 SMARTPROXY_PASSWORD = 'ys~j6rwfY95HikP3jZ'
-SMARTPROXY_URL = f"https://{SMARTPROXY_USERNAME}:{SMARTPROXY_PASSWORD}@gate.smartproxy.com:10001"
+SMARTPROXY_HOST = 'gate.smartproxy.com:10001'
 
 def configure_session():
     session = requests.Session()
+    
+    # Set up proxy authentication
+    auth = HTTPProxyAuth(SMARTPROXY_USERNAME, SMARTPROXY_PASSWORD)
+    session.auth = auth
+    
+    # Configure proxy URL without credentials
+    proxy_url = f"http://{SMARTPROXY_HOST}"
+    session.proxies = {
+        'http': proxy_url,
+        'https': proxy_url
+    }
+    
+    # Add headers
     session.headers.update({
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
         'Accept': 'application/json',
@@ -26,12 +40,7 @@ def configure_session():
         'Referer': 'https://www.surfline.com/'
     })
     
-    session.proxies = {
-        'http': SMARTPROXY_URL,
-        'https': SMARTPROXY_URL
-    }
-    
-    logger.debug("SmartProxy session configured")
+    logger.debug("SmartProxy session configured with auth")
     return session
 
 app = Flask(__name__)
@@ -42,25 +51,38 @@ def test_proxy():
     try:
         session = configure_session()
         
-        response = session.get('https://ip.smartproxy.com/json')
-        ip_data = response.json()
+        # Test sequence
+        ip_response = session.get('http://ip.smartproxy.com/json')
+        logger.debug(f"IP Response: {ip_response.text}")
         
         surfline_response = session.get(
             'https://services.surfline.com/kbyg/spots/details',
             params={'spotId': '5842041f4e65fad6a7708a7d'}
         )
+        logger.debug(f"Surfline Status: {surfline_response.status_code}")
 
         return jsonify({
-            'proxy_status': {
-                'working': True,
-                'ip_data': ip_data,
+            'proxy_test': {
+                'ip_data': ip_response.json(),
                 'surfline_status': surfline_response.status_code
             },
             'config': {
-                'proxy_url': SMARTPROXY_URL.replace(SMARTPROXY_PASSWORD, '****'),
+                'proxy_host': SMARTPROXY_HOST,
+                'username': SMARTPROXY_USERNAME,
                 'headers': dict(session.headers)
             }
         })
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Request error: {str(e)}")
+        return jsonify({
+            'error': str(e),
+            'type': 'RequestException',
+            'details': {
+                'proxy_configured': bool(session.proxies),
+                'auth_configured': bool(session.auth),
+                'headers': dict(session.headers)
+            }
+        }), 500
     except Exception as e:
         logger.error(f"Test error: {str(e)}")
         return jsonify({'error': str(e)}), 500
