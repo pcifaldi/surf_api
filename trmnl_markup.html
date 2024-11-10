@@ -1,0 +1,46 @@
+<div class="container text-center">
+  <!-- Main Title -->
+  <div class="header">
+    <span class="title">Tides and Surf for {{ location }}</span>
+  </div>
+
+  <!-- Two Column Layout -->
+  <div class="grid grid--cols-2 gap--medium align--center">
+    
+    <!-- Left Column - Tides -->
+    <div class="col col--center text-center">
+      <span class="title">Current Tides</span>
+      
+      <!-- Tide Entries -->
+      <div class="content text-center">
+        {% for tide in tides %}
+          <div class="item">
+            <span class="value value--medium">{{ tide.type | capitalize }}: </span>
+            <span class="value value--medium">{{ tide.time | date: "%I:%M %p" }}</span><br>
+            <span class="label label--medium">{{ tide.height }}ft</span>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Right Column - Surf Report -->
+    <div class="col col--center text-center">
+      <div class="content text-center">
+        <span class="title">Surf Report</span><br>
+        <span class="label">{{ current_conditions.surf.human_relation }}</span>
+        
+        <!-- Wave Height -->
+        <div class="item">
+          <span class="value value--xlarge value--tnums">{{ current_conditions.surf.min }}-{{ current_conditions.surf.max }}ft</span>
+        </div>
+
+        <!-- Wind Conditions -->
+        <div class="item">
+          <span class="value value--medium">Conditions:</span><br>
+          <span class="label">Wind: {{ current_conditions.wind.speed }}mph @ {{ current_conditions.wind.direction }}° {{ current_conditions.wind.type }}</span><br>
+          <span class="label">Temperature: {{ current_conditions.temperature }}°F</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
