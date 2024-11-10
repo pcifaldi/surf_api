@@ -30,6 +30,9 @@ https://pollingserver.com/api/surf?spotId=5842041f4e65fad6a7708cfd
 
 The app retrieves and organizes data, displaying it using the HTML markup found in `trmnl_markup.html`. This markup is structured to align with the TRMNL design system and provides a clean, accessible format for surf reports.
 
+
+![Screen Render](screen_render.png)
+
 ### Example Markup
 
 Refer to `trmnl_markup.html` for the display structure, which includes:
