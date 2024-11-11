@@ -44,8 +44,8 @@ Refer to `trmnl_markup.html` for the display structure, which includes:
 
 To use ScrapingBee for API requests, you must set the `SCRAPING_BEE_API_KEY` environment variable on your server:
 
-```bash
 SCRAPING_BEE_API_KEY=your_api_key_here
+
 ScrapingBee offers a free tier with 1,000 requests per month. This script uses 6 credits per poll request.
 
 ## Dependencies
